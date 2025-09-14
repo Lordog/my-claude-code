@@ -3,19 +3,15 @@ Agent implementations for Claude-Code-Python
 """
 
 from .base_agent import BaseAgent
-from .main_agent import MainAgent
-from .code_agent import CodeAgent
-from .tool_agent import ToolAgent
-from .debug_agent import DebugAgent
-from .test_agent import TestAgent
-from .doc_agent import DocAgent
+from .lead_agent import LeadAgent
+from .general_purpose_agent import GeneralPurposeAgent
+from .statusline_setup_agent import StatuslineSetupAgent
+from .output_style_setup_agent import OutputStyleSetupAgent
 
 __all__ = [
     "BaseAgent",
-    "MainAgent",
-    "CodeAgent", 
-    "ToolAgent",
-    "DebugAgent",
-    "TestAgent",
-    "DocAgent",
+    "LeadAgent",
+    "GeneralPurposeAgent",
+    "StatuslineSetupAgent", 
+    "OutputStyleSetupAgent"
 ]

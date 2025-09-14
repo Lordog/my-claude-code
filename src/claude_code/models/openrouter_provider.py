@@ -1,5 +1,5 @@
 """
-Kimi-k2 model provider
+openrouter model provider
 """
 
 import os
@@ -31,13 +31,15 @@ class OpenRouterProvider(BaseModelProvider):
         
         try:
             # Test with a simple request
+            print('Test Openrouter')
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": "Hello"}],
                 max_tokens=10
             )
             return True
-        except Exception:
+        except Exception as e:
+            print(e)
             return False
     
     async def generate_response(self, messages: List[Dict[str, str]], **kwargs) -> str:

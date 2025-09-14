@@ -4,14 +4,13 @@ Base agent implementation
 
 from typing import Dict, Any, List
 from abc import ABC, abstractmethod
-from ..core.agent_registry import BaseAgent as BaseAgentRegistry
 
 
-class BaseAgent(BaseAgentRegistry):
+class BaseAgent(ABC):
     """Base implementation for all agents"""
     
     def __init__(self, name: str, description: str = "", capabilities: List[str] = None):
-        super().__init__(name)
+        self.name = name
         self.description = description
         self.capabilities = capabilities or []
         self.model_manager = None

@@ -126,12 +126,12 @@ class ToolExecutor:
             
             # Execute the tool
             if hasattr(tool, 'execute'):
-                result = await tool.execute(parameters, context)
+                result = await tool.execute(**parameters)
             elif hasattr(tool, 'run'):
-                result = await tool.run(parameters, context)
+                result = await tool.run(**parameters)
             else:
                 # Try to call the tool directly with parameters
-                result = await tool(parameters, context)
+                result = await tool(**parameters)
             
             return ToolResult(
                 tool_name=tool_name,
@@ -183,7 +183,18 @@ class ToolExecutor:
         
         for result in execution_result.results:
             if result.success:
-                formatted_results.append(f"✅ {result.tool_name}: {result.result}")
+                # Check if result.result is a dict with error field (tool internal error)
+                if isinstance(result.result, dict) and 'error' in result.result:
+                    if result.result['error'] is None:
+                        # Success case - show the actual result data
+                        display_result = result.result.get('result', result.result)
+                    else:
+                        # Tool internal error - show error message
+                        display_result = f"Error: {result.result['error']}"
+                else:
+                    # Direct result (not a dict with error field)
+                    display_result = result.result
+                formatted_results.append(f"✅ {result.tool_name}: {display_result}")
             else:
                 formatted_results.append(f"❌ {result.tool_name}: {result.error}")
         

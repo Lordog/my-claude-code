@@ -16,15 +16,19 @@ class Message:
     content: str
     timestamp: datetime
     metadata: Optional[Dict[str, Any]] = None
+    tool_calls: Optional[List[Dict[str, Any]]] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
-        return {
+        result = {
             'role': self.role,
             'content': self.content,
             'timestamp': self.timestamp.isoformat(),
             'metadata': self.metadata or {}
         }
+        if self.tool_calls:
+            result['tool_calls'] = self.tool_calls
+        return result
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Message':
@@ -33,7 +37,8 @@ class Message:
             role=data['role'],
             content=data['content'],
             timestamp=datetime.fromisoformat(data['timestamp']),
-            metadata=data.get('metadata')
+            metadata=data.get('metadata'),
+            tool_calls=data.get('tool_calls')
         )
 
 
@@ -82,7 +87,7 @@ class ContextManager:
         if self.persist_context:
             self._load_context()
     
-    def add_message(self, role: str, content: str, metadata: Optional[Dict[str, Any]] = None):
+    def add_message(self, role: str, content: str, metadata: Optional[Dict[str, Any]] = None, tool_calls: Optional[List[Dict[str, Any]]] = None):
         """
         Add a message to the conversation history
         
@@ -90,12 +95,14 @@ class ContextManager:
             role: Message role ('user', 'assistant', 'system')
             content: Message content
             metadata: Optional metadata
+            tool_calls: Optional tool calls for assistant messages
         """
         message = Message(
             role=role,
             content=content,
             timestamp=datetime.now(),
-            metadata=metadata
+            metadata=metadata,
+            tool_calls=tool_calls
         )
         
         self.messages.append(message)

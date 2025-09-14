@@ -7,6 +7,7 @@ import argparse
 import sys
 from typing import Optional
 from .core.claude_code_system import ClaudeCodeSystem, ClaudeCodeConfig
+from .utils.logger import get_logger, log_function_call, log_function_result, log_error
 
 
 class ClaudeCodeCLI:
@@ -14,68 +15,101 @@ class ClaudeCodeCLI:
     
     def __init__(self):
         self.system: Optional[ClaudeCodeSystem] = None
+        self.logger = get_logger("claude_code.cli")
     
     async def initialize(self, config: Optional[ClaudeCodeConfig] = None):
         """Initialize the system"""
-        self.system = ClaudeCodeSystem(config)
-        await self.system.initialize()
+        log_function_call(self.logger, "ClaudeCodeCLI.initialize", config=config)
+        
+        try:
+            self.logger.info("Initializing Claude Code system")
+            self.system = ClaudeCodeSystem(config)
+            await self.system.initialize()
+            self.logger.info("System initialized successfully")
+            self.system.clear_context()
+            self.logger.info("System initialized successfully")
+            log_function_result(self.logger, "ClaudeCodeCLI.initialize", "Success", True)
+        except Exception as e:
+            log_error(self.logger, e, "ClaudeCodeCLI.initialize")
+            raise
     
     async def run_interactive(self):
         """Run interactive mode"""
-        print("🤖 Claude-Code-Python - Interactive Mode")
-        print("Type 'help' for commands, 'quit' to exit")
-        print("-" * 50)
+        log_function_call(self.logger, "ClaudeCodeCLI.run_interactive")
         
-        while True:
-            try:
-                user_input = input("\n> ").strip()
-                
-                if not user_input:
-                    continue
-                
-                if user_input.lower() in ['quit', 'exit', 'q']:
-                    print("Goodbye! 👋")
+        try:
+            print("🤖 Claude-Code-Python - Interactive Mode")
+            print("Type 'help' for commands, 'quit' to exit")
+            print("-" * 50)
+            
+            self.logger.info("Starting interactive mode")
+            
+            while True:
+                try:
+                    user_input = input("\n> ").strip()
+                    
+                    if not user_input:
+                        continue
+                    
+                    self.logger.debug(f"User input: {user_input}")
+                    
+                    if user_input.lower() in ['quit', 'exit', 'q']:
+                        self.logger.info("User requested exit")
+                        print("Goodbye! 👋")
+                        break
+                    
+                    if user_input.lower() == 'help':
+                        self._show_help()
+                        continue
+                    
+                    if user_input.lower() == 'agents':
+                        self._show_agents()
+                        continue
+                    
+                    if user_input.lower() == 'tools':
+                        self._show_tools()
+                        continue
+                    
+                    if user_input.lower() == 'context':
+                        self._show_context()
+                        continue
+                    
+                    if user_input.lower() == 'clear':
+                        self.logger.info("Clearing context")
+                        self.system.clear_context()
+                        print("Context cleared.")
+                        continue
+                    
+                    # Process the request
+                    print("🤔 Thinking...")
+                    self.logger.info(f"Processing user request: {user_input[:50]}...")
+                    response = await self.system.process_request(user_input)
+                    
+                    if "error" in response:
+                        self.logger.error(f"Request processing failed: {response['error']}")
+                        print(f"❌ Error: {response['error']}")
+                    else:
+                        self.logger.info("Request processed successfully")
+                        print(f"\n🤖 Response:\n{response['response']}")
+                    
+                except KeyboardInterrupt:
+                    self.logger.info("Keyboard interrupt received")
+                    print("\n\nGoodbye! 👋")
                     break
-                
-                if user_input.lower() == 'help':
-                    self._show_help()
-                    continue
-                
-                if user_input.lower() == 'agents':
-                    self._show_agents()
-                    continue
-                
-                if user_input.lower() == 'tools':
-                    self._show_tools()
-                    continue
-                
-                if user_input.lower() == 'context':
-                    self._show_context()
-                    continue
-                
-                if user_input.lower() == 'clear':
-                    self.system.clear_context()
-                    print("Context cleared.")
-                    continue
-                
-                # Process the request
-                print("🤔 Thinking...")
-                response = await self.system.process_request(user_input)
-                
-                if "error" in response:
-                    print(f"❌ Error: {response['error']}")
-                else:
-                    print(f"\n🤖 Response:\n{response['response']}")
-                
-            except KeyboardInterrupt:
-                print("\n\nGoodbye! 👋")
-                break
-            except EOFError:
-                print("\n\nGoodbye! 👋")
-                break
-            except Exception as e:
-                print(f"❌ Unexpected error: {e}")
-                break
+                except EOFError:
+                    self.logger.info("EOF received")
+                    print("\n\nGoodbye! 👋")
+                    break
+                except Exception as e:
+                    log_error(self.logger, e, "ClaudeCodeCLI.run_interactive.loop")
+                    print(f"❌ Unexpected error: {e}")
+                    break
+            
+            log_function_result(self.logger, "ClaudeCodeCLI.run_interactive", "Completed", True)
+            
+        except Exception as e:
+            log_error(self.logger, e, "ClaudeCodeCLI.run_interactive")
+            raise
     
     async def run_single(self, request: str):
         """Run single request mode"""

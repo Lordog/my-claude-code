@@ -3,9 +3,11 @@ Loop-based agent implementation that supports multiple tool calls until Exit too
 """
 
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from .base_agent import BaseAgent
+from .agent_settings import AgentSettings, DEFAULT_LOOP_AGENT_SETTINGS
 from ..core.output_parser import OutputParser
 from ..core.tool_executor import ToolExecutor
 from ..tools import (
@@ -13,13 +15,24 @@ from ..tools import (
     ReadTool, EditTool, WriteTool, WebFetchTool, 
     TodoWriteTool, WebSearchTool, ExitTool
 )
+import json
+
+@dataclass
+class AgentResponse:
+    """Complete response from an agent including content and tool calls"""
+    content: str
+    tool_calls: Optional[List[Dict[str, Any]]] = None
+    finish_reason: Optional[str] = None
 
 
 class LoopAgent(BaseAgent):
     """Base agent that supports loop-based execution with tool calling"""
     
-    def __init__(self, name: str, description: str = "", capabilities: List[str] = None, available_tools: List[str] = None, can_delegate: bool = False):
-        super().__init__(name, description, capabilities)
+    def __init__(self, name: str, description: str = "", capabilities: List[str] = None, 
+                 available_tools: List[str] = None, can_delegate: bool = False, 
+                 settings: Optional[AgentSettings] = None):
+        self.settings = settings or DEFAULT_LOOP_AGENT_SETTINGS.copy()
+        super().__init__(name, description, capabilities, self.settings)
         self.available_tools = available_tools or []
         self.can_delegate = can_delegate
         self.tools = {}
@@ -61,10 +74,10 @@ class LoopAgent(BaseAgent):
             self.tools["Task"].set_sub_agents(sub_agents)
         self.tool_executor.set_sub_agents(sub_agents)
     
-    async def execute(self, request: str, context: Dict[str, Any]) -> str:
+    async def execute(self, request: str, context: Dict[str, Any]) -> AgentResponse:
         """Execute the agent's task with loop-based tool calling"""
         if not self.model_manager:
-            return "Error: Model manager not set"
+            return AgentResponse(content="Error: Model manager not set")
         
         # Prepare initial messages
         messages = self._prepare_messages(request, context)
@@ -73,10 +86,10 @@ class LoopAgent(BaseAgent):
         return await self._execute_with_loop(messages, request, context)
     
     async def _execute_with_loop(self, initial_messages: List[Dict[str, str]], 
-                                request: str, context: Dict[str, Any]) -> str:
+                                request: str, context: Dict[str, Any]) -> AgentResponse:
         """Execute with loop-based tool calling until Exit tool is called"""
         messages = initial_messages.copy()
-        max_iterations = 10  # Prevent infinite loops
+        max_iterations = self.settings.max_iterations
         iteration = 0
         
         # Convert tools to Kimi format
@@ -104,14 +117,26 @@ class LoopAgent(BaseAgent):
                     # Add tool results to conversation
                     if tool_results:
                         tool_summary = self.tool_executor.format_tool_results(tool_results)
-                        messages.append({"role": "assistant", "content": response["content"] or ""})
+                        tool_calls_data = [{
+                            'id': tc.id,
+                            'type': tc.type,
+                            'function': {
+                                'name': tc.function.name,
+                                'arguments': tc.function.arguments
+                            }
+                        } for tc in response.get("tool_calls", [])]
+                        tool_calls_content = ''
+                        #for tool_call in tool_calls_data:
+                        #    tool_calls_content += '\n' + json.dumps(tool_call, indent=2, ensure_ascii=False)
+                        content = response["content"] + tool_calls_content
+                        messages.append({"role": "assistant", "content": content or ""})
                         messages.append({"role": "user", "content": f"Tool execution results:\n{tool_summary}"})
                     else:
                         # No tools to execute, return the response
-                        return response["content"] or ""
+                        return AgentResponse(content=response["content"] or "", tool_calls=response.get("tool_calls"), finish_reason=response.get("finish_reason"))
                 else:
                     # No tool actions, return the response
-                    return response["content"] or ""
+                    return AgentResponse(content=response["content"] or "", tool_calls=response.get("tool_calls"), finish_reason=response.get("finish_reason"))
             else:
                 # Regular text response, parse for tool calls in text format
                 parsed_output = self.output_parser.parse(response)
@@ -131,38 +156,52 @@ class LoopAgent(BaseAgent):
                         messages.append({"role": "user", "content": f"Tool execution results:\n{tool_summary}"})
                     else:
                         # No tools to execute, return the response
-                        return response
+                        return AgentResponse(content=response)
                 else:
                     # No tool actions, return the response
-                    return response
+                    return AgentResponse(content=response)
         
         # Max iterations reached
-        return f"Maximum iterations ({max_iterations}) reached. Please use the Exit tool to terminate execution."
+        return AgentResponse(content=f"Maximum iterations ({max_iterations}) reached. Please use the Exit tool to terminate execution.")
     
-    def _parse_kimi_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List:
+    def _parse_kimi_tool_calls(self, tool_calls: List[Union[Dict[str, Any], Any]]) -> List:
         """Parse Kimi tool calls into ToolAction objects"""
         from ..core.output_parser import ToolAction
         import json
         
         tool_actions = []
         for tool_call in tool_calls:
-            if tool_call.get("type") == "function":
-                function = tool_call.get("function", {})
-                tool_name = function.get("name")
-                arguments = function.get("arguments", "{}")
-                action_id = tool_call.get("id")
-                
-                try:
-                    parameters = json.loads(arguments)
-                except json.JSONDecodeError:
-                    parameters = {}
-                
-                tool_action = ToolAction(
-                    tool_name=tool_name,
-                    parameters=parameters,
-                    action_id=action_id
-                )
-                tool_actions.append(tool_action)
+            # Handle both Pydantic model objects and dictionaries
+            if hasattr(tool_call, 'type'):
+                # Pydantic model object
+                if tool_call.type == "function":
+                    function = tool_call.function
+                    tool_name = function.name
+                    arguments = function.arguments or "{}"
+                    action_id = tool_call.id
+            elif isinstance(tool_call, dict):
+                # Dictionary object
+                if tool_call.get("type") == "function":
+                    function = tool_call.get("function", {})
+                    tool_name = function.get("name")
+                    arguments = function.get("arguments", "{}")
+                    action_id = tool_call.get("id")
+                else:
+                    continue
+            else:
+                continue
+            
+            try:
+                parameters = json.loads(arguments)
+            except json.JSONDecodeError:
+                parameters = {}
+            
+            tool_action = ToolAction(
+                tool_name=tool_name,
+                parameters=parameters,
+                action_id=action_id
+            )
+            tool_actions.append(tool_action)
         
         return tool_actions
     
@@ -173,23 +212,25 @@ class LoopAgent(BaseAgent):
                 return True
         return False
     
-    def _handle_exit(self, parsed_output, response: str) -> str:
+    def _handle_exit(self, parsed_output, response: str) -> AgentResponse:
         """Handle the Exit tool call"""
         # Extract the content before the Exit tool call
         content = parsed_output.content.strip()
         if content:
-            return content
+            return AgentResponse(content=content)
         else:
-            return "Task completed."
+            return AgentResponse(content="Task completed.")
     
-    def _handle_kimi_exit(self, response: Dict[str, Any], tool_actions: List) -> str:
+    def _handle_kimi_exit(self, response: Dict[str, Any], tool_actions: List) -> AgentResponse:
         """Handle the Exit tool call from Kimi format"""
         # Extract the content before the Exit tool call
         content = response.get("content", "").strip()
+        tool_calls = response.get("tool_calls")
+        finish_reason = response.get("finish_reason")
         if content:
-            return content
+            return AgentResponse(content=content, tool_calls=tool_calls, finish_reason=finish_reason)
         else:
-            return "Task completed."
+            return AgentResponse(content="Task completed.", tool_calls=tool_calls, finish_reason=finish_reason)
     
     async def _execute_tools(self, tool_actions: List, context: Dict[str, Any]):
         """Execute tool actions and return results"""
@@ -211,12 +252,6 @@ Description: {self.description}
 
 Available tools:
 {self._format_available_tools()}
-
-Tool Usage Instructions:
-To use tools, format your tool calls in one of these ways:
-1. <tool_name>{"param1": "value1", "param2": "value2"}</tool_name>
-2. [tool_name: {"param1": "value1", "param2": "value2"}]
-3. TOOL_CALL: tool_name {"param1": "value1", "param2": "value2"}
 
 You can make multiple tool calls in a single response. The system will execute all tools and provide you with the results.
 

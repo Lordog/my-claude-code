@@ -2,7 +2,7 @@
 
 ## Overview
 
-Claude-Code-Python is an agent framework that implements a sophisticated workflow pipeline for processing user requests through intelligent agents and tool execution. The system follows a clear separation of concerns with modular components that work together to provide a seamless user experience.
+Claude-Code-Python is an intelligent agent framework that implements a sophisticated workflow pipeline for processing user requests through specialized agents and tool execution. The system follows a clear separation of concerns with modular components that work together to provide a seamless user experience.
 
 ## Core Architecture
 
@@ -10,17 +10,22 @@ Claude-Code-Python is an agent framework that implements a sophisticated workflo
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Claude-Code-Python                          │
 ├─────────────────────────────────────────────────────────────────┤
-│  User Interface Layer (CLI/Web/API)                            │
+│  User Interface Layer (CLI)                                    │
+├─────────────────────────────────────────────────────────────────┤
+│  Claude Code System (Main Controller)                          │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  System Initialization & Configuration Management      │   │
+│  └─────────────────────────────────────────────────────────┘   │
 ├─────────────────────────────────────────────────────────────────┤
 │  Workflow Pipeline (Main Orchestrator)                         │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │  Lead Agent → Task Tool → Sub-Agents → Tool Executor   │   │
+│  │  Request Processing → Agent Execution → Response        │   │
 │  └─────────────────────────────────────────────────────────┘   │
 ├─────────────────────────────────────────────────────────────────┤
 │  Agent Management System                                       │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │  Agent Registry │  │  Task Tool      │  │  Sub-Agents     │  │
-│  │  (Agent Info)   │  │  (Task Router)  │  │  (Specialized)  │  │
+│  │  Agent Registry │  │  Lead Agent     │  │  Sub-Agents     │  │
+│  │  (Agent Info)   │  │  (Orchestrator) │  │  (Specialized)  │  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
 ├─────────────────────────────────────────────────────────────────┤
 │  Tool Execution System                                         │
@@ -40,159 +45,129 @@ Claude-Code-Python is an agent framework that implements a sophisticated workflo
 │  │  Model Manager  │  │  OpenRouter     │  │  Mock Provider  │  │
 │  │  (Abstraction)  │  │  (Primary)      │  │  (Fallback)     │  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│  Logging & Debug System                                        │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │  Logger Config  │  │  Performance    │  │  Error Tracking │  │
+│  │  (Centralized)  │  │  Monitoring     │  │  (Debug Info)   │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Workflow Pipeline
-
-The core of the system is the **Workflow Pipeline**, which orchestrates the entire process:
-
-### 1. Request Processing Flow
-
-```
-User Request → Lead Agent (Loop-based Execution) → Response
-```
-
-**Step-by-step process:**
-
-1. **User Input**: User submits a request through CLI or API
-2. **Lead Agent Processing**: The Lead Agent receives the request and enters a loop-based execution mode
-3. **Loop Execution**: The agent can make multiple tool calls and task delegations in a loop
-4. **Tool Execution**: Tools are executed within the agent loop with results fed back to the agent
-5. **Task Delegation**: Lead Agent can delegate tasks to sub-agents via Task tool
-6. **Exit Condition**: Loop continues until the agent calls the Exit tool (success/failed)
-7. **Response**: Final response is returned to the user
-
-### 2. Agent Task Routing Flow
-
-```
-Request → LeadAgent (Loop) → Task Tool (Router) → Sub-Agent (Loop) → Exit Tool → Response
-```
-
-**When sub-agents are involved:**
-
-1. **LeadAgent Processing**: The LeadAgent receives the request and enters loop-based execution
-2. **Task Tool Routing**: The LeadAgent calls the Task tool with the task details and subagent_type
-3. **Sub-Agent Selection**: The Task tool routes the task to the specified sub-agent based on subagent_type
-4. **Sub-Agent Loop**: The sub-agent processes the request in its own loop with multiple tool calls
-5. **Exit Condition**: Sub-agent continues until it calls the Exit tool (success/failed)
-6. **Result Integration**: Results are returned through the Task tool back to the LeadAgent
-7. **LeadAgent Continuation**: LeadAgent continues its loop until it calls the Exit tool
-
 ## Core Components
 
-### 1. Workflow Pipeline (`workflow_pipeline.py`)
+### 1. ClaudeCodeSystem (`claude_code_system.py`)
 
-**Purpose**: Main orchestrator that coordinates all system components
+**Purpose**: Main system controller that orchestrates all components
 
 **Key Features**:
-- Processes user requests through loop-based execution
-- Manages task routing to sub-agents via Task Tool
-- Handles context updates and result integration
-- Provides unified interface for the system
-- Supports multi-step tool calling and task delegation
+- System initialization and configuration management
+- Model provider registration and management
+- Sub-agent coordination
+- Request processing coordination
+- Error handling and logging
 
 **Main Methods**:
-- `process_request()`: Process requests through Lead Agent
-- `process_with_sub_agent()`: Process requests with specific sub-agents
-- `route_task_to_subagent()`: Route tasks to sub-agents via Task Tool
+- `__init__()`: Initialize system components
+- `initialize()`: Initialize model providers
+- `process_request()`: Process user requests
+- `shutdown()`: Cleanup resources
 
-### 2. Output Parser (`output_parser.py`)
+**Dependencies**:
+- WorkflowPipeline
+- ModelManager
+- LeadAgent
+- Sub-agents
 
-**Purpose**: Parses agent responses to extract content and tool actions
+### 2. WorkflowPipeline (`workflow_pipeline.py`)
+
+**Purpose**: Main orchestrator that processes requests through the agent framework
 
 **Key Features**:
-- Supports multiple tool call formats
-- Extracts JSON parameters from tool calls
-- Handles action IDs for tool tracking
-- Cleans content for user display
+- Request processing and routing
+- Agent execution coordination
+- Context management integration
+- Tool execution coordination
+- Result processing and formatting
 
-**Supported Formats**:
-- `<tool_name>{"param": "value"}</tool_name>`
-- `[tool_name: {"param": "value"}]`
-- `TOOL_CALL: tool_name {"param": "value"}`
+**Main Methods**:
+- `process_request()`: Process requests with lead agent
+- `process_with_sub_agent()`: Process requests with specific sub-agents
+- `register_sub_agent()`: Register new sub-agents
+- `set_model_manager()`: Configure model manager for all agents
 
-### 3. Tool Executor (`tool_executor.py`)
+**Dependencies**:
+- LeadAgent
+- AgentRegistry
+- ContextManager
+- ToolExecutor
+- OutputParser
 
+### 3. Agent System
+
+#### BaseAgent (`base_agent.py`)
+**Purpose**: Base class for all agents
+
+**Key Features**:
+- Common agent functionality
+- Model manager integration
+- Message preparation and processing
+- Logging and error handling
+
+**Main Methods**:
+- `execute()`: Execute agent task
+- `_prepare_messages()`: Prepare messages for model
+- `_get_system_prompt()`: Get system prompt
+- `_post_process_response()`: Post-process model response
+
+#### LeadAgent (`lead_agent.py`)
+**Purpose**: Main orchestrator agent with access to all tools and sub-agents
+
+**Key Features**:
+- Access to all available tools
+- Task delegation to sub-agents
+- Loop-based execution
+- Tool calling and result integration
+
+**Available Tools**:
+- All file operation tools (Read, Write, Edit, LS, Glob, Grep)
+- System tools (Bash)
+- Web tools (WebSearch, WebFetch)
+- Task management (TodoWrite, Task)
+- Exit tool (Exit)
+
+#### Sub-Agents
+- **GeneralPurposeAgent**: Complex research and multi-step tasks
+- **StatuslineSetupAgent**: Claude Code status line configuration
+- **OutputStyleSetupAgent**: Claude Code output style creation
+
+### 4. Tool System
+
+#### ToolExecutor (`tool_executor.py`)
 **Purpose**: Executes tool actions and manages tool results
 
 **Key Features**:
-- Sequential tool execution to avoid conflicts
-- Error handling and result tracking
+- Sequential tool execution
+- Error handling and recovery
 - Tool registry management
-- Result formatting for display
+- Result formatting and tracking
 
 **Tool Categories**:
-- File operations (Read, Write, Edit, LS, Glob, Grep)
-- System operations (Bash)
-- Web operations (WebSearch, WebFetch)
-- Task management (TodoWrite, Task - routes to sub-agents)
+- **File Operations**: Read, Write, Edit, LS, Glob, Grep
+- **System Operations**: Bash
+- **Web Operations**: WebSearch, WebFetch
+- **Task Management**: TodoWrite, Task (routes to sub-agents)
+- **Control Flow**: Exit (terminates agent loops)
 
-### 4. LoopAgent (`loop_agent.py`)
+#### Tool Implementation
+Each tool inherits from `BaseTool` and implements:
+- `execute()`: Main tool execution logic
+- `validate_parameters()`: Parameter validation
+- Error handling and result formatting
 
-**Purpose**: Base agent class that supports loop-based execution with tool calling
+### 5. Context Management
 
-**Key Features**:
-- Loop-based execution until Exit tool is called
-- Multiple tool calls per execution cycle
-- Tool result integration back to agent
-- Configurable available tools per agent
-- Support for task delegation (LeadAgent only)
-
-**Execution Flow**:
-1. Agent receives request and enters execution loop
-2. Agent generates response with potential tool calls
-3. Tools are executed and results fed back to agent
-4. Loop continues until Exit tool is called
-5. Final response is returned
-
-### 5. Agent Registry (`agent_registry.py`)
-
-**Purpose**: Manages sub-agents and their capabilities
-
-**Key Features**:
-- Agent registration and discovery
-- Sub-agent management and routing
-- Agent capability tracking
-- Agent information management
-
-**Agent Types**:
-- **Lead Agent**: Main orchestrator with access to all tools, routes tasks via Task Tool (can delegate)
-- **General Purpose Agent**: Handles complex research and multi-step tasks (Tools: All available, cannot delegate)
-- **Statusline Setup Agent**: Handles Claude Code status line configuration (Tools: Read, Edit, cannot delegate)
-- **Output Style Setup Agent**: Handles Claude Code output style creation (Tools: Read, Write, Edit, Glob, LS, Grep, cannot delegate)
-
-### 6. Task Tool (`task_tool.py`)
-
-**Purpose**: Routes tasks to specialized sub-agents based on subagent_type
-
-**Key Features**:
-- Direct task routing based on subagent_type parameter
-- Sub-agent validation and error handling
-- Task context passing to sub-agents
-- Result formatting and error reporting
-
-**Supported Sub-Agent Types**:
-- `general-purpose`: For complex research and multi-step tasks
-- `statusline-setup`: For Claude Code status line configuration
-- `output-style-setup`: For Claude Code output style creation
-
-### 7. Exit Tool (`exit_tool.py`)
-
-**Purpose**: Terminates agent execution loops
-
-**Key Features**:
-- Required tool for all agents to exit execution loops
-- Supports success and failed status
-- Optional message for completion details
-- Prevents infinite loops in agent execution
-
-**Parameters**:
-- `status`: "success" or "failed" - completion status
-- `message`: Optional explanation of completion or issues
-
-### 8. Context Manager (`context_manager.py`)
-
+#### ContextManager (`context_manager.py`)
 **Purpose**: Manages conversation history and project state
 
 **Key Features**:
@@ -202,61 +177,119 @@ Request → LeadAgent (Loop) → Task Tool (Router) → Sub-Agent (Loop) → Exi
 - Context persistence and loading
 
 **Data Structures**:
-- **Messages**: Conversation history with roles and timestamps
-- **Project Info**: File system state and project metadata
+- **Message**: Conversation history with roles and timestamps
+- **ProjectInfo**: File system state and project metadata
 - **Session Data**: Temporary data for the current session
+
+**Main Methods**:
+- `add_message()`: Add message to conversation
+- `set_project()`: Set current project
+- `get_context()`: Get complete context
+- `clear_context()`: Clear all context data
+
+### 6. Model Integration
+
+#### ModelManager (`model_manager.py`)
+**Purpose**: Manages different AI model providers
+
+**Key Features**:
+- Provider registration and management
+- Automatic fallback handling
+- Provider availability checking
+- Unified response generation
+
+**Provider Types**:
+- **OpenRouterProvider**: Primary provider using OpenRouter API
+- **MockProvider**: Fallback provider for testing
+
+**Main Methods**:
+- `register_provider()`: Register model provider
+- `generate_response()`: Generate response using available provider
+- `get_available_providers()`: Get list of available providers
+- `initialize_providers()`: Initialize all providers
+
+### 7. Logging System
+
+#### Logger (`utils/logger.py`)
+**Purpose**: Centralized logging configuration and utilities
+
+**Key Features**:
+- Configurable log levels and outputs
+- Colored console output
+- File logging support
+- Performance monitoring
+- Error tracking and debugging
+
+**Log Levels**:
+- DEBUG: Detailed debugging information
+- INFO: General information
+- WARNING: Warning messages
+- ERROR: Error conditions
+- CRITICAL: Critical errors
+
+**Utility Functions**:
+- `log_function_call()`: Log function calls with parameters
+- `log_function_result()`: Log function results
+- `log_error()`: Log errors with context
+- `log_performance()`: Log performance metrics
 
 ## Data Flow
 
-### 1. Request Processing
+### 1. System Initialization
 
 ```
-User Request
-    ↓
-Workflow Pipeline
-    ↓
-Lead Agent (Loop-based Execution)
-    ↓
-Model Manager (LLM API) → Tool Calls → Tool Executor
-    ↓
-Loop continues until Exit tool called
-    ↓
-Context Manager (update state)
-    ↓
-Response to User
+Start → ClaudeCodeSystem.__init__() → Initialize Components → Register Providers → Ready
 ```
 
-### 2. Loop-based Tool Execution
+**Steps**:
+1. Initialize model manager
+2. Create lead agent
+3. Initialize workflow pipeline
+4. Create and register sub-agents
+5. Register model providers
+6. Initialize providers and check availability
+
+### 2. Request Processing
 
 ```
-Agent Response with Tool Calls
-    ↓
-Tool Executor (within agent loop)
-    ↓
-Individual Tools
-    ↓
-Tool Results fed back to Agent
-    ↓
-Agent continues loop or calls Exit tool
-    ↓
-Final Response
+User Request → CLI → ClaudeCodeSystem → WorkflowPipeline → LeadAgent → Model → Response
 ```
 
-### 3. Agent Task Routing
+**Detailed Flow**:
+1. **User Input**: User submits request via CLI
+2. **System Processing**: ClaudeCodeSystem processes request
+3. **Workflow Pipeline**: WorkflowPipeline coordinates processing
+4. **Agent Execution**: LeadAgent executes with loop-based processing
+5. **Model Generation**: Model generates response
+6. **Context Update**: Context is updated with conversation
+7. **Response**: Response is returned to user
+
+### 3. Agent Loop Execution
 
 ```
-LeadAgent Loop Processing
-    ↓
-Task Tool Call (with subagent_type)
-    ↓
-Sub-Agent Loop Processing
-    ↓
-Sub-Agent calls Exit tool
-    ↓
-Result Return via Task Tool
-    ↓
-LeadAgent continues loop or calls Exit tool
+Agent Start → Generate Response → Parse Tool Calls → Execute Tools → Update Context → Check Exit → Continue/Exit
 ```
+
+**Loop Process**:
+1. Agent receives request and context
+2. Agent generates response with potential tool calls
+3. Tools are executed and results fed back to agent
+4. Context is updated with new information
+5. Loop continues until Exit tool is called
+6. Final response is returned
+
+### 4. Tool Execution
+
+```
+Tool Call → Parameter Validation → Tool Execution → Result Processing → Context Update
+```
+
+**Tool Process**:
+1. Tool call is parsed from agent response
+2. Parameters are validated
+3. Tool is executed with error handling
+4. Results are processed and formatted
+5. Context is updated with tool results
 
 ## Key Features
 
@@ -264,6 +297,7 @@ LeadAgent continues loop or calls Exit tool
 - Clear separation of concerns
 - Easy to extend with new agents and tools
 - Pluggable components
+- Loose coupling between modules
 
 ### 2. Loop-based Agent Execution
 - Multi-step tool calling within agent loops
@@ -272,7 +306,7 @@ LeadAgent continues loop or calls Exit tool
 - Support for complex multi-step tasks
 
 ### 3. Intelligent Task Routing
-- Direct task routing via Task Tool
+- Direct task routing via Task tool
 - Sub-agent type-based routing
 - Specialized agent capabilities
 - LeadAgent can delegate, sub-agents cannot
@@ -281,35 +315,42 @@ LeadAgent continues loop or calls Exit tool
 - Unified tool interface
 - Error handling and recovery
 - Result tracking and formatting
-- Loop-based tool execution
+- Sequential tool execution
 
 ### 5. Context Awareness
 - Conversation history management
 - Project state tracking
 - Session data persistence
+- Context summarization
 
-### 6. Flexible Output Parsing
-- Multiple tool call formats
-- JSON parameter extraction
-- Content cleaning and formatting
+### 6. Comprehensive Logging
+- Centralized logging configuration
+- Performance monitoring
+- Error tracking and debugging
+- Configurable output formats
+
+### 7. Model Abstraction
+- Unified model interface
+- Multiple provider support
+- Automatic fallback handling
+- Provider status monitoring
 
 ## Extension Points
 
 ### 1. Adding New Agents
 ```python
 # Create new agent
-class MyAgent(LoopAgent):
+class MyAgent(BaseAgent):
     def __init__(self, model_manager):
         super().__init__(
             name="MyAgent",
             description="My custom agent",
-            capabilities=["my_capability"],
-            available_tools=["Read", "Write", "Exit"],  # Specify available tools
-            can_delegate=False  # Set to True only for LeadAgent
+            capabilities=["my_capability"]
         )
         self.model_manager = model_manager
 
-# Register with workflow pipeline
+# Register with system
+system.sub_agents["my-agent"] = MyAgent(model_manager)
 workflow_pipeline.register_sub_agent(MyAgent(model_manager))
 ```
 
@@ -325,13 +366,26 @@ class MyTool(BaseTool):
 tool_executor.tools["MyTool"] = MyTool()
 ```
 
-### 3. Custom Output Parsers
+### 3. Adding New Model Providers
 ```python
-# Extend output parser
-class CustomOutputParser(OutputParser):
-    def parse(self, response):
-        # Custom parsing logic
-        return parsed_output
+# Create new provider
+class MyProvider(BaseModelProvider):
+    async def generate_response(self, messages, tools=None, **kwargs):
+        # Provider implementation
+        return response
+
+# Register with model manager
+model_manager.register_provider(MyProvider())
+```
+
+### 4. Custom Logging
+```python
+# Create custom logger
+logger = get_logger("my_module")
+
+# Use logging utilities
+log_function_call(logger, "my_function", param1=value1)
+log_performance(logger, "operation", duration, metric=value)
 ```
 
 ## Configuration
@@ -339,30 +393,35 @@ class CustomOutputParser(OutputParser):
 ### Environment Variables
 - `OPENROUTER_API_KEY`: API key for OpenRouter provider
 - `CLAUDE_CODE_DEBUG`: Enable debug mode
-- `CLAUDE_CODE_MODEL`: Default model to use
+- `CLAUDE_CODE_LOG_LEVEL`: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- `CLAUDE_CODE_LOG_FILE`: Log file path
 
 ### Configuration Options
 - Model selection and fallback providers
 - Context persistence settings
 - Message history limits
 - Tool execution timeouts
+- Logging configuration
 
 ## Security Considerations
 
 ### 1. Tool Execution Safety
-- Sandboxed tool execution
 - Parameter validation
+- Error handling and recovery
 - Resource limits
+- Sandboxed execution where possible
 
 ### 2. API Security
 - Secure API key management
 - Request rate limiting
 - Error message sanitization
+- Provider authentication
 
 ### 3. Data Privacy
 - Local context storage
 - Sensitive data filtering
 - User data protection
+- Context persistence controls
 
 ## Performance Optimizations
 
@@ -370,16 +429,25 @@ class CustomOutputParser(OutputParser):
 - Message history limits
 - Lazy project file scanning
 - Efficient context serialization
+- Context summarization
 
 ### 2. Tool Execution
 - Sequential execution to avoid conflicts
 - Result caching where appropriate
 - Timeout handling
+- Error recovery
 
 ### 3. Agent Management
-- Direct sub-agent routing via Task Tool
+- Direct sub-agent routing via Task tool
 - Sub-agent type-based selection
 - Efficient agent registration and management
+- Loop-based execution optimization
+
+### 4. Logging Performance
+- Asynchronous logging where possible
+- Log level filtering
+- Efficient log formatting
+- Performance monitoring
 
 ## Future Enhancements
 
@@ -387,20 +455,30 @@ class CustomOutputParser(OutputParser):
 - Multi-agent collaboration
 - Agent communication protocols
 - Dynamic agent creation
+- Agent learning and adaptation
 
 ### 2. Enhanced Tool System
 - Tool composition and chaining
 - Tool result streaming
 - Tool dependency management
+- Tool performance monitoring
 
 ### 3. Improved Context Management
 - Vector-based context search
 - Context summarization
 - Multi-project support
+- Context versioning
 
 ### 4. Better User Experience
 - Interactive tool execution
 - Real-time progress updates
 - Rich output formatting
+- Web interface
 
-This architecture provides a solid foundation for building sophisticated AI-powered development tools while maintaining flexibility and extensibility.
+### 5. Advanced Logging and Monitoring
+- Structured logging (JSON)
+- Metrics collection
+- Performance dashboards
+- Error reporting and alerting
+
+This architecture provides a solid foundation for building sophisticated AI-powered development tools while maintaining flexibility, extensibility, and comprehensive logging for debugging and monitoring.

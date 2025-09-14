@@ -2,20 +2,22 @@
 Statusline setup agent for configuring Claude Code status line settings
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from .loop_agent import LoopAgent
+from .agent_settings import AgentSettings, DEFAULT_LOOP_AGENT_SETTINGS
 
 
 class StatuslineSetupAgent(LoopAgent):
     """Agent for configuring Claude Code status line settings"""
     
-    def __init__(self, model_manager=None):
+    def __init__(self, model_manager=None, settings: Optional[AgentSettings] = None):
         super().__init__(
             name="statusline-setup",
             description="Use this agent to configure the user's Claude Code status line setting",
             capabilities=["statusline_configuration", "file_editing", "settings_management"],
             available_tools=["Read", "Edit", "Exit"],
-            can_delegate=False  # Cannot delegate tasks
+            can_delegate=False,  # Cannot delegate tasks
+            settings=settings or DEFAULT_LOOP_AGENT_SETTINGS.copy()
         )
         self.model_manager = model_manager
     

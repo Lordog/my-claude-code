@@ -5,6 +5,7 @@ Model manager for handling different AI model providers
 from typing import Dict, Any, Optional, List
 from abc import ABC, abstractmethod
 import asyncio
+from ..utils.logger import get_logger, log_function_call, log_function_result, log_error, log_performance
 
 
 class BaseModelProvider(ABC):
@@ -37,12 +38,26 @@ class ModelManager:
         self.providers: Dict[str, BaseModelProvider] = {}
         self.default_provider = None
         self.fallback_providers: List[str] = []
+        self.logger = get_logger("claude_code.model_manager")
     
     def register_provider(self, provider: BaseModelProvider, is_default: bool = False) -> None:
         """Register a model provider"""
-        self.providers[provider.name] = provider
-        if is_default:
-            self.default_provider = provider.name
+        log_function_call(self.logger, "ModelManager.register_provider", 
+                         provider_name=provider.name, is_default=is_default)
+        
+        try:
+            self.providers[provider.name] = provider
+            if is_default:
+                self.default_provider = provider.name
+                self.logger.info(f"Registered {provider.name} as default provider")
+            else:
+                self.logger.info(f"Registered provider: {provider.name}")
+            
+            log_function_result(self.logger, "ModelManager.register_provider", "Success", True)
+            
+        except Exception as e:
+            log_error(self.logger, e, "ModelManager.register_provider")
+            raise
     
     def set_fallback_providers(self, provider_names: List[str]) -> None:
         """Set fallback providers in order of preference"""

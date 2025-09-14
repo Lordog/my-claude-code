@@ -5,12 +5,14 @@ Workflow Pipeline - Main pipeline that orchestrates the agent framework
 import asyncio
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
+import time
 
 from .output_parser import OutputParser, ParsedOutput
 from .tool_executor import ToolExecutor, ExecutionResult
 from .agent_registry import AgentRegistry, TaskRouter
 from .context_manager import ContextManager
 from ..agents.base_agent import BaseAgent
+from ..utils.logger import get_logger, log_function_call, log_function_result, log_error, log_performance
 
 
 @dataclass
@@ -38,28 +40,54 @@ class WorkflowPipeline:
     def __init__(self, lead_agent: BaseAgent, model_manager=None):
         self.lead_agent = lead_agent
         self.model_manager = model_manager
+        self.logger = get_logger("claude_code.workflow")
         
-        # Initialize components
-        self.output_parser = OutputParser()
-        self.tool_executor = ToolExecutor()
-        self.agent_registry = AgentRegistry()
-        self.task_router = TaskRouter(self.agent_registry)
-        self.context_manager = ContextManager()
+        log_function_call(self.logger, "WorkflowPipeline.__init__", 
+                         lead_agent=lead_agent.name, model_manager=model_manager is not None)
         
-        # Set up lead agent
-        if self.model_manager:
-            self.lead_agent.set_model_manager(self.model_manager)
-        
-        # Set up tool executor with sub-agents
-        self.tool_executor.set_sub_agents({})
+        try:
+            # Initialize components
+            self.logger.info("Initializing workflow components")
+            self.output_parser = OutputParser()
+            self.tool_executor = ToolExecutor()
+            self.agent_registry = AgentRegistry()
+            self.task_router = TaskRouter(self.agent_registry)
+            self.context_manager = ContextManager()
+            
+            # Set up lead agent
+            if self.model_manager:
+                self.logger.debug("Setting model manager for lead agent")
+                self.lead_agent.set_model_manager(self.model_manager)
+            
+            # Set up tool executor with sub-agents
+            self.tool_executor.set_sub_agents({})
+            
+            self.logger.info("WorkflowPipeline initialized successfully")
+            log_function_result(self.logger, "WorkflowPipeline.__init__", "Success", True)
+            
+        except Exception as e:
+            log_error(self.logger, e, "WorkflowPipeline.__init__")
+            raise
     
     def register_sub_agent(self, agent: BaseAgent, priority: int = 0):
         """Register a sub-agent"""
-        self.agent_registry.register_agent(agent, priority)
+        log_function_call(self.logger, "WorkflowPipeline.register_sub_agent", 
+                         agent_name=agent.name, priority=priority)
         
-        # Update tool executor with new sub-agents
-        sub_agents = {name: info.agent for name, info in self.agent_registry.agents.items()}
-        self.tool_executor.set_sub_agents(sub_agents)
+        try:
+            self.agent_registry.register_agent(agent, priority)
+            self.logger.info(f"Registered sub-agent: {agent.name}")
+            
+            # Update tool executor with new sub-agents
+            sub_agents = {name: info.agent for name, info in self.agent_registry.agents.items()}
+            self.tool_executor.set_sub_agents(sub_agents)
+            self.logger.debug(f"Updated tool executor with {len(sub_agents)} sub-agents")
+            
+            log_function_result(self.logger, "WorkflowPipeline.register_sub_agent", "Success", True)
+            
+        except Exception as e:
+            log_error(self.logger, e, "WorkflowPipeline.register_sub_agent")
+            raise
     
     def set_model_manager(self, model_manager):
         """Set the model manager for all agents"""
@@ -81,40 +109,67 @@ class WorkflowPipeline:
         Returns:
             WorkflowResult containing the response and execution details
         """
+        log_function_call(self.logger, "WorkflowPipeline.process_request", 
+                         request=request[:100] + "..." if len(request) > 100 else request,
+                         context_keys=list(context.keys()) if context else None)
+        start_time = time.time()
+        
         try:
             # Update context manager
             if context:
+                self.logger.debug("Updating context with provided data")
                 self.context_manager.session_data.update(context)
             
             # Add user message to context
+            self.logger.debug("Adding user message to context")
             self.context_manager.add_message("user", request)
             
             # Get current context for agents
             current_context = self.context_manager.get_context()
+            self.logger.debug(f"Context contains {len(current_context.get('messages', []))} messages")
             
             # Process with lead agent (now supports loop-based execution)
+            self.logger.info("Processing request with lead agent")
             agent_response = await self.lead_agent.execute(request, current_context)
             
             # Add agent response to context
-            self.context_manager.add_message("assistant", agent_response)
+            self.logger.debug("Adding agent response to context")
+            self.context_manager.add_message("assistant", agent_response.content, tool_calls=agent_response.tool_calls)
             
-            return WorkflowResult(
-                content=agent_response,
+            duration = time.time() - start_time
+            log_performance(self.logger, "WorkflowPipeline.process_request", duration,
+                          agent_used=self.lead_agent.name, success=True)
+            
+            result = WorkflowResult(
+                content=agent_response.content,
                 tool_results=[],  # Tool results are now handled within the agent loop
                 agent_used=self.lead_agent.name,
                 success=True
             )
             
-        except Exception as e:
-            error_msg = f"Error processing request: {str(e)}"
-            self.context_manager.add_message("system", f"Error: {error_msg}")
+            log_function_result(self.logger, "WorkflowPipeline.process_request", "Success", True)
+            return result
             
-            return WorkflowResult(
+        except Exception as e:
+            log_error(self.logger, e, "WorkflowPipeline.process_request")
+            error_msg = f"Error processing request: {str(e)}"
+            
+            '''
+            # Remove the last user message that caused the error and add error message
+            if self.context_manager.messages and self.context_manager.messages[-1].role == "user":
+                self.context_manager.messages.pop()
+            '''
+            self.context_manager.add_message("user", f"Error: {error_msg}")
+            
+            result = WorkflowResult(
                 content="I encountered an error while processing your request. Please try again.",
                 tool_results=[],
                 success=False,
                 error=error_msg
             )
+            
+            log_function_result(self.logger, "WorkflowPipeline.process_request", "Failed", False)
+            return result
     
     async def process_with_sub_agent(self, request: str, agent_name: str, 
                                    context: Optional[Dict[str, Any]] = None) -> WorkflowResult:
@@ -154,11 +209,11 @@ class WorkflowPipeline:
             agent_response = await sub_agent.execute(request, current_context)
             
             # Add agent response to context
-            self.context_manager.add_message("assistant", agent_response, 
-                                           metadata={"agent": agent_name})
+            self.context_manager.add_message("assistant", agent_response.content, 
+                                           metadata={"agent": agent_name}, tool_calls=agent_response.tool_calls)
             
             return WorkflowResult(
-                content=agent_response,
+                content=agent_response.content,
                 tool_results=[],  # Tool results are now handled within the agent loop
                 agent_used=agent_name,
                 success=True
@@ -166,54 +221,14 @@ class WorkflowPipeline:
             
         except Exception as e:
             error_msg = f"Error processing request with sub-agent: {str(e)}"
-            self.context_manager.add_message("system", f"Error: {error_msg}")
             
-            return WorkflowResult(
-                content="I encountered an error while processing your request. Please try again.",
-                tool_results=[],
-                success=False,
-                error=error_msg
-            )
-    
-    async def auto_route_request(self, request: str, context: Optional[Dict[str, Any]] = None) -> WorkflowResult:
-        """
-        Automatically route a request to the best available agent
-        
-        Args:
-            request: User's request/query
-            context: Optional context information
+            '''
+            # Remove the last user message that caused the error and add error message
+            if self.context_manager.messages and self.context_manager.messages[-1].role == "user":
+                self.context_manager.messages.pop()
+            '''
+            self.context_manager.add_message("user", f"Error: {error_msg}")
             
-        Returns:
-            WorkflowResult containing the response and execution details
-        """
-        try:
-            # Get current context
-            current_context = self.context_manager.get_context()
-            if context:
-                current_context.update(context)
-            
-            # Route the task
-            selected_agent, reasoning = self.task_router.route_task(request, current_context)
-            
-            if not selected_agent:
-                return WorkflowResult(
-                    content="I couldn't find a suitable agent to handle your request.",
-                    tool_results=[],
-                    success=False,
-                    error="No suitable agent found"
-                )
-            
-            # Add routing decision to context
-            self.context_manager.add_message("system", f"Routing decision: {reasoning}")
-            
-            # Process with selected agent
-            if selected_agent.name == self.lead_agent.name:
-                return await self.process_request(request, context)
-            else:
-                return await self.process_with_sub_agent(request, selected_agent.name, context)
-                
-        except Exception as e:
-            error_msg = f"Error in auto-routing: {str(e)}"
             return WorkflowResult(
                 content="I encountered an error while processing your request. Please try again.",
                 tool_results=[],

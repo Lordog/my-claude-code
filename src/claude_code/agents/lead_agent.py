@@ -6,6 +6,7 @@ import json
 import asyncio
 from typing import Dict, Any, List, Optional
 from .loop_agent import LoopAgent
+from .agent_settings import AgentSettings, DEFAULT_LEAD_AGENT_SETTINGS
 from ..core.output_parser import OutputParser
 from ..core.tool_executor import ToolExecutor
 from ..tools import (
@@ -13,18 +14,19 @@ from ..tools import (
     ReadTool, EditTool, WriteTool, WebFetchTool, 
     TodoWriteTool, WebSearchTool, ExitTool
 )
-
+from .prompts import lead_agent_prompt
+from ..utils.context_utils import get_context_variables
 
 class LeadAgent(LoopAgent):
     """Main agent that orchestrates all tools and sub-agents"""
     
-    def __init__(self, model_manager=None):
+    def __init__(self, model_manager=None, settings: Optional[AgentSettings] = None):
         super().__init__(
             name="LeadAgent",
             description="Main agent with access to all tools and sub-agents",
-            capabilities=["code_generation", "file_operations", "web_search", "task_delegation"],
             available_tools=None,  # All tools available
-            can_delegate=True  # Can delegate tasks to sub-agents
+            can_delegate=True,  # Can delegate tasks to sub-agents
+            settings=settings or DEFAULT_LEAD_AGENT_SETTINGS.copy()
         )
         self.model_manager = model_manager
         self.sub_agents = {}
@@ -41,22 +43,20 @@ class LeadAgent(LoopAgent):
     
     def _get_system_prompt(self, context: Dict[str, Any]) -> str:
         """Get system prompt for the lead agent"""
-        base_prompt = """You are the LeadAgent, the main orchestrator in the Claude Code system. You have access to all tools and can route tasks to specialized sub-agents.
-
-Available sub-agents:
-- general-purpose: For researching complex questions, searching for code, and executing multi-step tasks
-- statusline-setup: For configuring Claude Code status line settings
-- output-style-setup: For creating Claude Code output styles
-
-When to use sub-agents:
-- Use general-purpose for complex research or multi-step tasks
-- Use statusline-setup for status line configuration
-- Use output-style-setup for output style creation
-- For simple file operations, use tools directly
-
-IMPORTANT: When you have completed the task or encountered an error that cannot be resolved, you MUST call the Exit tool with either "success" or "failed" status.
-
-Always be helpful, accurate, and efficient in your responses."""
+        # Get context variables from utils
+        context_vars = get_context_variables()
+        
+        # Merge with provided context, giving priority to provided context
+        merged_context = {**context_vars, **context}
+        
+        base_prompt = lead_agent_prompt.format(
+            working_directory=merged_context.get("working_directory", "Unknown"),
+            is_directory_a_git_repo=merged_context.get("is_directory_a_git_repo", "Unknown"),
+            platform=merged_context.get("platform", "Unknown"),
+            os_version=merged_context.get("os_version", "Unknown"),
+            today_date=merged_context.get("today_date", "Unknown"),
+            last_5_recent_commits=merged_context.get("last_5_recent_commits", "Unknown"),
+        )
         
         # Add project context if available
         if "project" in context and context["project"] is not None:

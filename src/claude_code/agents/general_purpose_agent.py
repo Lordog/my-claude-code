@@ -2,20 +2,22 @@
 General-purpose agent for researching complex questions and executing multi-step tasks
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from .loop_agent import LoopAgent
+from .agent_settings import AgentSettings, DEFAULT_GENERAL_PURPOSE_AGENT_SETTINGS
 
 
 class GeneralPurposeAgent(LoopAgent):
     """General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks"""
     
-    def __init__(self, model_manager=None):
+    def __init__(self, model_manager=None, settings: Optional[AgentSettings] = None):
         super().__init__(
             name="general-purpose",
             description="General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks",
             capabilities=["research", "code_search", "multi_step_execution", "analysis", "problem_solving"],
             available_tools=["Bash", "Glob", "Grep", "LS", "Read", "Edit", "Write", "WebFetch", "TodoWrite", "WebSearch", "Exit"],
-            can_delegate=False  # Cannot delegate tasks
+            can_delegate=False,  # Cannot delegate tasks
+            settings=settings or DEFAULT_GENERAL_PURPOSE_AGENT_SETTINGS.copy()
         )
         self.model_manager = model_manager
     

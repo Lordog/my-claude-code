@@ -2,20 +2,22 @@
 Output style setup agent for creating Claude Code output styles
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from .loop_agent import LoopAgent
+from .agent_settings import AgentSettings, DEFAULT_LOOP_AGENT_SETTINGS
 
 
 class OutputStyleSetupAgent(LoopAgent):
     """Agent for creating Claude Code output styles"""
     
-    def __init__(self, model_manager=None):
+    def __init__(self, model_manager=None, settings: Optional[AgentSettings] = None):
         super().__init__(
             name="output-style-setup",
             description="Use this agent to create a Claude Code output style",
             capabilities=["output_style_creation", "file_operations", "style_configuration", "template_management"],
             available_tools=["Read", "Write", "Edit", "Glob", "LS", "Grep", "Exit"],
-            can_delegate=False  # Cannot delegate tasks
+            can_delegate=False,  # Cannot delegate tasks
+            settings=settings or DEFAULT_LOOP_AGENT_SETTINGS.copy()
         )
         self.model_manager = model_manager
     

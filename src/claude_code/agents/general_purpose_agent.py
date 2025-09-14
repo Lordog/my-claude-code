@@ -3,17 +3,19 @@ General-purpose agent for researching complex questions and executing multi-step
 """
 
 from typing import Dict, Any, List
-from .base_agent import BaseAgent
+from .loop_agent import LoopAgent
 
 
-class GeneralPurposeAgent(BaseAgent):
+class GeneralPurposeAgent(LoopAgent):
     """General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks"""
     
     def __init__(self, model_manager=None):
         super().__init__(
             name="general-purpose",
             description="General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks",
-            capabilities=["research", "code_search", "multi_step_execution", "analysis", "problem_solving"]
+            capabilities=["research", "code_search", "multi_step_execution", "analysis", "problem_solving"],
+            available_tools=["Bash", "Glob", "Grep", "LS", "Read", "Edit", "Write", "WebFetch", "TodoWrite", "WebSearch", "Exit"],
+            can_delegate=False  # Cannot delegate tasks
         )
         self.model_manager = model_manager
     
@@ -28,18 +30,6 @@ Your capabilities include:
 - Analyzing codebases and providing insights
 - Problem-solving and debugging assistance
 
-Available tools:
-- Bash: Execute shell commands
-- Glob: Find files by pattern
-- Grep: Search file contents
-- LS: List directory contents
-- Read: Read files
-- Edit: Edit files with exact string replacements
-- Write: Write/create files
-- WebFetch: Fetch web content
-- TodoWrite: Manage task lists
-- WebSearch: Search the web
-
 You have access to all tools and should use them proactively to:
 - Search for files and code patterns
 - Read and analyze code
@@ -53,6 +43,8 @@ When working on a task:
 3. Use appropriate tools to gather information
 4. Execute the necessary actions
 5. Provide a comprehensive summary of your work
+
+IMPORTANT: When you have completed the task or encountered an error that cannot be resolved, you MUST call the Exit tool with either "success" or "failed" status.
 
 Be thorough, accurate, and methodical in your approach."""
         

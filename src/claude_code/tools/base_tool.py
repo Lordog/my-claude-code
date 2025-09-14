@@ -38,3 +38,14 @@ class BaseTool(ABC):
             "description": self.description,
             "input_schema": self.input_schema
         }
+    
+    def get_kimi_schema(self) -> Dict[str, Any]:
+        """Get the tool schema in Kimi format"""
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": self.input_schema
+            }
+        }

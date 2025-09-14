@@ -43,16 +43,21 @@ class OutputParser:
         # Pattern to match action IDs
         self.action_id_pattern = r'action_id["\']?\s*:\s*["\']?([^"\']+)["\']?'
     
-    def parse(self, response: str) -> ParsedOutput:
+    def parse(self, response) -> ParsedOutput:
         """
         Parse agent response into content and tool actions
         
         Args:
-            response: Raw agent response string
+            response: Raw agent response string or dict (for Kimi format)
             
         Returns:
             ParsedOutput containing content and tool actions
         """
+        # Handle Kimi format response
+        if isinstance(response, dict) and "tool_calls" in response:
+            return self._parse_kimi_response(response)
+        
+        # Handle string response
         content = response
         tool_actions = []
         
@@ -95,6 +100,37 @@ class OutputParser:
         
         # Clean up content
         content = self._clean_content(content)
+        
+        return ParsedOutput(
+            content=content,
+            tool_actions=tool_actions,
+            has_tool_actions=len(tool_actions) > 0
+        )
+    
+    def _parse_kimi_response(self, response: Dict[str, Any]) -> ParsedOutput:
+        """Parse Kimi format response"""
+        content = response.get("content", "")
+        tool_actions = []
+        
+        if "tool_calls" in response:
+            for tool_call in response["tool_calls"]:
+                if tool_call.get("type") == "function":
+                    function = tool_call.get("function", {})
+                    tool_name = function.get("name")
+                    arguments = function.get("arguments", "{}")
+                    action_id = tool_call.get("id")
+                    
+                    try:
+                        parameters = json.loads(arguments)
+                    except json.JSONDecodeError:
+                        parameters = {}
+                    
+                    tool_action = ToolAction(
+                        tool_name=tool_name,
+                        parameters=parameters,
+                        action_id=action_id
+                    )
+                    tool_actions.append(tool_action)
         
         return ParsedOutput(
             content=content,

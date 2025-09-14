@@ -3,17 +3,19 @@ Statusline setup agent for configuring Claude Code status line settings
 """
 
 from typing import Dict, Any, List
-from .base_agent import BaseAgent
+from .loop_agent import LoopAgent
 
 
-class StatuslineSetupAgent(BaseAgent):
+class StatuslineSetupAgent(LoopAgent):
     """Agent for configuring Claude Code status line settings"""
     
     def __init__(self, model_manager=None):
         super().__init__(
             name="statusline-setup",
             description="Use this agent to configure the user's Claude Code status line setting",
-            capabilities=["statusline_configuration", "file_editing", "settings_management"]
+            capabilities=["statusline_configuration", "file_editing", "settings_management"],
+            available_tools=["Read", "Edit", "Exit"],
+            can_delegate=False  # Cannot delegate tasks
         )
         self.model_manager = model_manager
     
@@ -27,16 +29,14 @@ Your capabilities include:
 - Managing Claude Code status line customization
 - Providing guidance on status line configuration options
 
-Available tools:
-- Read: Read configuration files
-- Edit: Edit files with exact string replacements
-
 When working on status line setup:
 1. Read the current status line configuration
 2. Understand the user's requirements
 3. Make appropriate modifications
 4. Ensure the configuration is valid and functional
 5. Provide clear instructions on how to apply changes
+
+IMPORTANT: When you have completed the task or encountered an error that cannot be resolved, you MUST call the Exit tool with either "success" or "failed" status.
 
 Focus specifically on status line configuration and avoid other tasks."""
         

@@ -14,6 +14,7 @@ from .write_tool import WriteTool
 from .web_fetch_tool import WebFetchTool
 from .todo_write_tool import TodoWriteTool
 from .web_search_tool import WebSearchTool
+from .exit_tool import ExitTool
 
 __all__ = [
     'BaseTool',
@@ -27,5 +28,6 @@ __all__ = [
     'WriteTool',
     'WebFetchTool',
     'TodoWriteTool',
-    'WebSearchTool'
+    'WebSearchTool',
+    'ExitTool'
 ]

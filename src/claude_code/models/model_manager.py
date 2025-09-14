@@ -15,8 +15,8 @@ class BaseModelProvider(ABC):
         self.is_available = False
     
     @abstractmethod
-    async def generate_response(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        """Generate a response from the model"""
+    async def generate_response(self, messages: List[Dict[str, str]], tools: Optional[List[Dict[str, Any]]] = None, **kwargs) -> str:
+        """Generate a response from the model with optional tool calling"""
         pass
     
     @abstractmethod
@@ -63,6 +63,7 @@ class ModelManager:
         self, 
         messages: List[Dict[str, str]], 
         provider_name: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         **kwargs
     ) -> str:
         """Generate response using specified or default provider"""
@@ -71,7 +72,7 @@ class ModelManager:
             provider = self.providers[provider_name]
             if provider.is_available:
                 try:
-                    return await provider.generate_response(messages, **kwargs)
+                    return await provider.generate_response(messages, tools=tools, **kwargs)
                 except Exception as e:
                     print(f"Error with provider {provider_name}: {e}")
         
@@ -80,7 +81,7 @@ class ModelManager:
             provider = self.providers[self.default_provider]
             if provider.is_available:
                 try:
-                    return await provider.generate_response(messages, **kwargs)
+                    return await provider.generate_response(messages, tools=tools, **kwargs)
                 except Exception as e:
                     print(f"Error with default provider {self.default_provider}: {e}")
         
@@ -90,7 +91,7 @@ class ModelManager:
                 provider = self.providers[fallback_name]
                 if provider.is_available:
                     try:
-                        return await provider.generate_response(messages, **kwargs)
+                        return await provider.generate_response(messages, tools=tools, **kwargs)
                     except Exception as e:
                         print(f"Error with fallback provider {fallback_name}: {e}")
         

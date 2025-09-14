@@ -25,7 +25,7 @@ class MockProvider(BaseModelProvider):
         """Mock provider is always available"""
         return True
     
-    async def generate_response(self, messages: List[Dict[str, str]], **kwargs) -> str:
+    async def generate_response(self, messages: List[Dict[str, str]], tools: Optional[List[Dict[str, Any]]] = None, **kwargs) -> str:
         """Generate a mock response"""
         # Simulate some processing time
         await asyncio.sleep(0.1)

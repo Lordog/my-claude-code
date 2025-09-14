@@ -9,7 +9,7 @@ from .output_parser import ToolAction, ParsedOutput
 from ..tools import (
     TaskTool, BashTool, GlobTool, GrepTool, LSTool, 
     ReadTool, EditTool, WriteTool, WebFetchTool, 
-    TodoWriteTool, WebSearchTool
+    TodoWriteTool, WebSearchTool, ExitTool
 )
 
 
@@ -53,6 +53,7 @@ class ToolExecutor:
         self.tools["WebFetch"] = WebFetchTool()
         self.tools["TodoWrite"] = TodoWriteTool()
         self.tools["WebSearch"] = WebSearchTool()
+        self.tools["Exit"] = ExitTool()
     
     def set_sub_agents(self, sub_agents: Dict[str, Any]):
         """Set sub-agents for tools that need them"""

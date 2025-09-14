@@ -79,12 +79,3 @@ You should focus on your specific domain and provide helpful, accurate responses
         """Post-process the model response"""
         # Override in subclasses for specific processing
         return response
-    
-    def can_handle(self, request: str, context: Dict[str, Any]) -> bool:
-        """Check if this agent can handle the request"""
-        # Basic keyword matching - override in subclasses for more sophisticated logic
-        request_lower = request.lower()
-        for capability in self.capabilities:
-            if capability.lower() in request_lower:
-                return True
-        return False

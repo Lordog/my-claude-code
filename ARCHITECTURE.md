@@ -50,31 +50,34 @@ The core of the system is the **Workflow Pipeline**, which orchestrates the enti
 ### 1. Request Processing Flow
 
 ```
-User Request → Lead Agent → Output Parser → Tool Executor → Context Update → Response
+User Request → Lead Agent (Loop-based Execution) → Response
 ```
 
 **Step-by-step process:**
 
 1. **User Input**: User submits a request through CLI or API
-2. **Lead Agent Processing**: The Lead Agent receives the request and generates a response
-3. **Output Parsing**: The response is parsed to extract content and tool actions
-4. **Tool Execution**: Any tool actions are executed by the Tool Executor
-5. **Context Update**: Results are stored in the Context Manager
-6. **Response**: Final response is returned to the user
+2. **Lead Agent Processing**: The Lead Agent receives the request and enters a loop-based execution mode
+3. **Loop Execution**: The agent can make multiple tool calls and task delegations in a loop
+4. **Tool Execution**: Tools are executed within the agent loop with results fed back to the agent
+5. **Task Delegation**: Lead Agent can delegate tasks to sub-agents via Task tool
+6. **Exit Condition**: Loop continues until the agent calls the Exit tool (success/failed)
+7. **Response**: Final response is returned to the user
 
 ### 2. Agent Task Routing Flow
 
 ```
-Request → LeadAgent → Task Tool (Router) → Sub-Agent Processing → Tool Execution → Response
+Request → LeadAgent (Loop) → Task Tool (Router) → Sub-Agent (Loop) → Exit Tool → Response
 ```
 
 **When sub-agents are involved:**
 
-1. **LeadAgent Processing**: The LeadAgent receives the request and determines if a sub-agent is needed
+1. **LeadAgent Processing**: The LeadAgent receives the request and enters loop-based execution
 2. **Task Tool Routing**: The LeadAgent calls the Task tool with the task details and subagent_type
 3. **Sub-Agent Selection**: The Task tool routes the task to the specified sub-agent based on subagent_type
-4. **Processing**: The sub-agent processes the request using its specialized tools and capabilities
-5. **Result Integration**: Results are returned through the Task tool back to the LeadAgent
+4. **Sub-Agent Loop**: The sub-agent processes the request in its own loop with multiple tool calls
+5. **Exit Condition**: Sub-agent continues until it calls the Exit tool (success/failed)
+6. **Result Integration**: Results are returned through the Task tool back to the LeadAgent
+7. **LeadAgent Continuation**: LeadAgent continues its loop until it calls the Exit tool
 
 ## Core Components
 
@@ -83,10 +86,11 @@ Request → LeadAgent → Task Tool (Router) → Sub-Agent Processing → Tool E
 **Purpose**: Main orchestrator that coordinates all system components
 
 **Key Features**:
-- Processes user requests through the complete workflow
+- Processes user requests through loop-based execution
 - Manages task routing to sub-agents via Task Tool
 - Handles context updates and result integration
 - Provides unified interface for the system
+- Supports multi-step tool calling and task delegation
 
 **Main Methods**:
 - `process_request()`: Process requests through Lead Agent
@@ -124,7 +128,25 @@ Request → LeadAgent → Task Tool (Router) → Sub-Agent Processing → Tool E
 - Web operations (WebSearch, WebFetch)
 - Task management (TodoWrite, Task - routes to sub-agents)
 
-### 4. Agent Registry (`agent_registry.py`)
+### 4. LoopAgent (`loop_agent.py`)
+
+**Purpose**: Base agent class that supports loop-based execution with tool calling
+
+**Key Features**:
+- Loop-based execution until Exit tool is called
+- Multiple tool calls per execution cycle
+- Tool result integration back to agent
+- Configurable available tools per agent
+- Support for task delegation (LeadAgent only)
+
+**Execution Flow**:
+1. Agent receives request and enters execution loop
+2. Agent generates response with potential tool calls
+3. Tools are executed and results fed back to agent
+4. Loop continues until Exit tool is called
+5. Final response is returned
+
+### 5. Agent Registry (`agent_registry.py`)
 
 **Purpose**: Manages sub-agents and their capabilities
 
@@ -135,12 +157,12 @@ Request → LeadAgent → Task Tool (Router) → Sub-Agent Processing → Tool E
 - Agent information management
 
 **Agent Types**:
-- **Lead Agent**: Main orchestrator with access to all tools, routes tasks via Task Tool
-- **General Purpose Agent**: Handles complex research and multi-step tasks (Tools: All available)
-- **Statusline Setup Agent**: Handles Claude Code status line configuration (Tools: Read, Edit)
-- **Output Style Setup Agent**: Handles Claude Code output style creation (Tools: Read, Write, Edit, Glob, LS, Grep)
+- **Lead Agent**: Main orchestrator with access to all tools, routes tasks via Task Tool (can delegate)
+- **General Purpose Agent**: Handles complex research and multi-step tasks (Tools: All available, cannot delegate)
+- **Statusline Setup Agent**: Handles Claude Code status line configuration (Tools: Read, Edit, cannot delegate)
+- **Output Style Setup Agent**: Handles Claude Code output style creation (Tools: Read, Write, Edit, Glob, LS, Grep, cannot delegate)
 
-### 5. Task Tool (`task_tool.py`)
+### 6. Task Tool (`task_tool.py`)
 
 **Purpose**: Routes tasks to specialized sub-agents based on subagent_type
 
@@ -155,7 +177,21 @@ Request → LeadAgent → Task Tool (Router) → Sub-Agent Processing → Tool E
 - `statusline-setup`: For Claude Code status line configuration
 - `output-style-setup`: For Claude Code output style creation
 
-### 6. Context Manager (`context_manager.py`)
+### 7. Exit Tool (`exit_tool.py`)
+
+**Purpose**: Terminates agent execution loops
+
+**Key Features**:
+- Required tool for all agents to exit execution loops
+- Supports success and failed status
+- Optional message for completion details
+- Prevents infinite loops in agent execution
+
+**Parameters**:
+- `status`: "success" or "failed" - completion status
+- `message`: Optional explanation of completion or issues
+
+### 8. Context Manager (`context_manager.py`)
 
 **Purpose**: Manages conversation history and project state
 
@@ -179,47 +215,47 @@ User Request
     ↓
 Workflow Pipeline
     ↓
-Lead Agent (or selected sub-agent)
+Lead Agent (Loop-based Execution)
     ↓
-Model Manager (LLM API)
+Model Manager (LLM API) → Tool Calls → Tool Executor
     ↓
-Output Parser
-    ↓
-Tool Executor (if tool actions found)
+Loop continues until Exit tool called
     ↓
 Context Manager (update state)
     ↓
 Response to User
 ```
 
-### 2. Tool Execution
+### 2. Loop-based Tool Execution
 
 ```
-Tool Actions (from parser)
+Agent Response with Tool Calls
     ↓
-Tool Executor
+Tool Executor (within agent loop)
     ↓
 Individual Tools
     ↓
-Tool Results
+Tool Results fed back to Agent
     ↓
-Context Update
+Agent continues loop or calls Exit tool
     ↓
-Result Formatting
+Final Response
 ```
 
 ### 3. Agent Task Routing
 
 ```
-LeadAgent Request Processing
+LeadAgent Loop Processing
     ↓
 Task Tool Call (with subagent_type)
     ↓
-Sub-Agent Validation
+Sub-Agent Loop Processing
     ↓
-Sub-Agent Processing
+Sub-Agent calls Exit tool
     ↓
 Result Return via Task Tool
+    ↓
+LeadAgent continues loop or calls Exit tool
 ```
 
 ## Key Features
@@ -229,22 +265,30 @@ Result Return via Task Tool
 - Easy to extend with new agents and tools
 - Pluggable components
 
-### 2. Intelligent Agent Management
+### 2. Loop-based Agent Execution
+- Multi-step tool calling within agent loops
+- Automatic loop termination via Exit tool
+- Tool result integration back to agents
+- Support for complex multi-step tasks
+
+### 3. Intelligent Task Routing
 - Direct task routing via Task Tool
 - Sub-agent type-based routing
 - Specialized agent capabilities
+- LeadAgent can delegate, sub-agents cannot
 
-### 3. Robust Tool System
+### 4. Robust Tool System
 - Unified tool interface
 - Error handling and recovery
 - Result tracking and formatting
+- Loop-based tool execution
 
-### 4. Context Awareness
+### 5. Context Awareness
 - Conversation history management
 - Project state tracking
 - Session data persistence
 
-### 5. Flexible Output Parsing
+### 6. Flexible Output Parsing
 - Multiple tool call formats
 - JSON parameter extraction
 - Content cleaning and formatting
@@ -254,12 +298,14 @@ Result Return via Task Tool
 ### 1. Adding New Agents
 ```python
 # Create new agent
-class MyAgent(BaseAgent):
+class MyAgent(LoopAgent):
     def __init__(self, model_manager):
         super().__init__(
             name="MyAgent",
             description="My custom agent",
-            capabilities=["my_capability"]
+            capabilities=["my_capability"],
+            available_tools=["Read", "Write", "Exit"],  # Specify available tools
+            can_delegate=False  # Set to True only for LeadAgent
         )
         self.model_manager = model_manager
 

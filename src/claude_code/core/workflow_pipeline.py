@@ -72,7 +72,7 @@ class WorkflowPipeline:
     
     async def process_request(self, request: str, context: Optional[Dict[str, Any]] = None) -> WorkflowResult:
         """
-        Process a user request through the workflow pipeline
+        Process a user request through the workflow pipeline with loop-based execution
         
         Args:
             request: User's request/query
@@ -92,32 +92,15 @@ class WorkflowPipeline:
             # Get current context for agents
             current_context = self.context_manager.get_context()
             
-            # Process with lead agent
+            # Process with lead agent (now supports loop-based execution)
             agent_response = await self.lead_agent.execute(request, current_context)
             
             # Add agent response to context
             self.context_manager.add_message("assistant", agent_response)
             
-            # Parse the agent response
-            parsed_output = self.output_parser.parse(agent_response)
-            
-            # Execute tool actions if any
-            tool_results = []
-            if parsed_output.has_tool_actions:
-                execution_result = await self.tool_executor.execute_tool_actions(
-                    parsed_output.tool_actions, 
-                    current_context
-                )
-                tool_results.append(execution_result)
-                
-                # Add tool results to context
-                if execution_result.results:
-                    tool_summary = self.tool_executor.format_tool_results(execution_result)
-                    self.context_manager.add_message("system", f"Tool execution results:\n{tool_summary}")
-            
             return WorkflowResult(
-                content=parsed_output.content,
-                tool_results=tool_results,
+                content=agent_response,
+                tool_results=[],  # Tool results are now handled within the agent loop
                 agent_used=self.lead_agent.name,
                 success=True
             )
@@ -136,7 +119,7 @@ class WorkflowPipeline:
     async def process_with_sub_agent(self, request: str, agent_name: str, 
                                    context: Optional[Dict[str, Any]] = None) -> WorkflowResult:
         """
-        Process a request with a specific sub-agent
+        Process a request with a specific sub-agent with loop-based execution
         
         Args:
             request: User's request/query
@@ -167,33 +150,16 @@ class WorkflowPipeline:
             # Get current context for agents
             current_context = self.context_manager.get_context()
             
-            # Process with sub-agent
+            # Process with sub-agent (now supports loop-based execution)
             agent_response = await sub_agent.execute(request, current_context)
             
             # Add agent response to context
             self.context_manager.add_message("assistant", agent_response, 
                                            metadata={"agent": agent_name})
             
-            # Parse the agent response
-            parsed_output = self.output_parser.parse(agent_response)
-            
-            # Execute tool actions if any
-            tool_results = []
-            if parsed_output.has_tool_actions:
-                execution_result = await self.tool_executor.execute_tool_actions(
-                    parsed_output.tool_actions, 
-                    current_context
-                )
-                tool_results.append(execution_result)
-                
-                # Add tool results to context
-                if execution_result.results:
-                    tool_summary = self.tool_executor.format_tool_results(execution_result)
-                    self.context_manager.add_message("system", f"Tool execution results:\n{tool_summary}")
-            
             return WorkflowResult(
-                content=parsed_output.content,
-                tool_results=tool_results,
+                content=agent_response,
+                tool_results=[],  # Tool results are now handled within the agent loop
                 agent_used=agent_name,
                 success=True
             )

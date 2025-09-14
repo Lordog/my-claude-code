@@ -31,7 +31,6 @@ class OpenRouterProvider(BaseModelProvider):
         
         try:
             # Test with a simple request
-            print('Test Openrouter')
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": "Hello"}],
@@ -42,8 +41,8 @@ class OpenRouterProvider(BaseModelProvider):
             print(e)
             return False
     
-    async def generate_response(self, messages: List[Dict[str, str]], **kwargs) -> str:
-        """Generate response using OpenRouter"""
+    async def generate_response(self, messages: List[Dict[str, str]], tools: Optional[List[Dict[str, Any]]] = None, **kwargs) -> str:
+        """Generate response using OpenRouter with optional tool calling"""
         if not self.client:
             raise Exception("OpenRouter provider not initialized")
         
@@ -63,14 +62,31 @@ class OpenRouterProvider(BaseModelProvider):
             "temperature": kwargs.get("temperature", 0.7),
         }
         
+        # Add tools if provided
+        if tools:
+            params["tools"] = tools
+        
         # Add any additional parameters
         for key, value in kwargs.items():
-            if key not in ["max_tokens", "temperature"]:
+            if key not in ["max_tokens", "temperature", "tools"]:
                 params[key] = value
         
         try:
             response = self.client.chat.completions.create(**params)
-            return response.choices[0].message.content
+            
+            # Check if the response contains tool calls
+            message = response.choices[0].message
+            if hasattr(message, 'tool_calls') and message.tool_calls:
+                # Return the raw response for tool calling
+                return {
+                    "content": message.content or "",
+                    "tool_calls": message.tool_calls,
+                    "finish_reason": response.choices[0].finish_reason
+                }
+            else:
+                # Return just the content for regular responses
+                return message.content or ""
+                
         except Exception as e:
             raise Exception(f"Error generating response with OpenRouter: {str(e)}")
     

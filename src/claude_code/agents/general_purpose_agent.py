@@ -5,6 +5,8 @@ General-purpose agent for researching complex questions and executing multi-step
 from typing import Dict, Any, List, Optional
 from .loop_agent import LoopAgent
 from .agent_settings import AgentSettings, DEFAULT_GENERAL_PURPOSE_AGENT_SETTINGS
+from .prompts import general_purpose_agent_prompt
+from ..utils.context_utils import get_context_variables
 
 
 class GeneralPurposeAgent(LoopAgent):
@@ -15,7 +17,7 @@ class GeneralPurposeAgent(LoopAgent):
             name="general-purpose",
             description="General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks",
             capabilities=["research", "code_search", "multi_step_execution", "analysis", "problem_solving"],
-            available_tools=["Bash", "Glob", "Grep", "LS", "Read", "Edit", "Write", "WebFetch", "TodoWrite", "WebSearch", "Exit"],
+            available_tools=None,  # All tools available
             can_delegate=False,  # Cannot delegate tasks
             settings=settings or DEFAULT_GENERAL_PURPOSE_AGENT_SETTINGS.copy()
         )
@@ -23,33 +25,20 @@ class GeneralPurposeAgent(LoopAgent):
     
     def _get_system_prompt(self, context: Dict[str, Any]) -> str:
         """Get system prompt for the general-purpose agent"""
-        base_prompt = """You are a general-purpose agent specialized in researching complex questions, searching for code, and executing multi-step tasks.
-
-Your capabilities include:
-- Researching complex technical questions
-- Searching for code patterns and implementations
-- Executing multi-step tasks autonomously
-- Analyzing codebases and providing insights
-- Problem-solving and debugging assistance
-
-You have access to all tools and should use them proactively to:
-- Search for files and code patterns
-- Read and analyze code
-- Execute commands and scripts
-- Research information online
-- Break down complex tasks into manageable steps
-
-When working on a task:
-1. Understand the full scope of the request
-2. Break it down into logical steps
-3. Use appropriate tools to gather information
-4. Execute the necessary actions
-5. Provide a comprehensive summary of your work
-
-IMPORTANT: When you have completed the task or encountered an error that cannot be resolved, you MUST call the Exit tool with either "success" or "failed" status.
-
-Be thorough, accurate, and methodical in your approach."""
+        # Get context variables from utils
+        context_vars = get_context_variables()
         
+        # Merge with provided context, giving priority to provided context
+        merged_context = {**context_vars, **context}
+        
+        base_prompt = general_purpose_agent_prompt.format(
+            working_directory=merged_context.get("working_directory", "Unknown"),
+            is_directory_a_git_repo=merged_context.get("is_directory_a_git_repo", "Unknown"),
+            platform=merged_context.get("platform", "Unknown"),
+            os_version=merged_context.get("os_version", "Unknown"),
+            today_date=merged_context.get("today_date", "Unknown"),
+            last_5_recent_commits=merged_context.get("last_5_recent_commits", "Unknown"),
+        )
         # Add project context if available
         if "project" in context:
             project = context["project"]

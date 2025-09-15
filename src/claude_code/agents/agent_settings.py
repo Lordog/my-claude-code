@@ -11,7 +11,7 @@ class AgentSettings:
     """Configuration settings for agents"""
     
     # Loop execution settings
-    max_iterations: int = 100
+    max_iterations: int = 200
     """Maximum number of iterations for loop-based agents to prevent infinite loops"""
     
     # Conversation history settings
@@ -97,21 +97,21 @@ class AgentSettings:
 
 # Default settings for different agent types
 DEFAULT_LOOP_AGENT_SETTINGS = AgentSettings(
-    max_iterations=100,
+    max_iterations=200,
     max_context_messages=5,
     enable_tool_calling=True,
     enable_delegation=False,
 )
 
 DEFAULT_LEAD_AGENT_SETTINGS = AgentSettings(
-    max_iterations=100,  # Lead agents might need more iterations
+    max_iterations=200,  # Lead agents might need more iterations
     max_context_messages=5,
     enable_tool_calling=True,
     enable_delegation=True,
 )
 
 DEFAULT_GENERAL_PURPOSE_AGENT_SETTINGS = AgentSettings(
-    max_iterations=50,  # General purpose agents might need more iterations
+    max_iterations=200,  # General purpose agents might need more iterations
     max_context_messages=5,
     enable_tool_calling=True,
     enable_delegation=False,

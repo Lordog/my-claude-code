@@ -11,55 +11,44 @@ class ExitTool(BaseTool):
     
     def __init__(self):
         super().__init__(
-            name="Exit",
-            description="Terminate the current execution loop. Use this when you have completed the task or encountered an error that cannot be resolved.",
+            name="ExitPlanMode",
+            description="Use this tool when you are in plan mode and have finished presenting your plan and are ready to code. This will prompt the user to exit plan mode. \nIMPORTANT: Only use this tool when the task requires planning the implementation steps of a task that requires writing code. For research tasks where you're gathering information, searching files, reading files or in general trying to understand the codebase - do NOT use this tool.\n\nEg. \n1. Initial task: \"Search for and understand the implementation of vim mode in the codebase\" - Do not use the exit plan mode tool because you are not planning the implementation steps of a task.\n2. Initial task: \"Help me implement yank mode for vim\" - Use the exit plan mode tool after you have finished planning the implementation steps of the task.\n",
             input_schema={
                 "type": "object",
                 "properties": {
-                    "status": {
+                    "plan": {
                         "type": "string",
-                        "enum": ["success", "failed"],
-                        "description": "The status of the task completion - 'success' if completed successfully, 'failed' if encountered an error"
-                    },
-                    "message": {
-                        "type": "string",
-                        "description": "Optional message explaining the completion status or any issues encountered"
+                        "description": "The plan you came up with, that you want to run by the user for approval. Supports markdown. The plan should be pretty concise."
                     }
                 },
-                "required": ["status"],
-                "additionalProperties": False
+                "required": [
+                    "plan"
+                ],
+                "additionalProperties": False,
+                "$schema": "http://json-schema.org/draft-07/schema#"
             }
         )
     
-    async def execute(self, status: str, message: str = "") -> Dict[str, Any]:
-        """Execute the exit action"""
-        if not self.validate_input(status=status, message=message):
+    async def execute(self, plan: str) -> Dict[str, Any]:
+        """Execute the exit plan mode action"""
+        if not self.validate_input(plan=plan):
             return {
                 "error": "Invalid input parameters",
                 "result": None
             }
         
-        if status not in ["success", "failed"]:
-            return {
-                "error": "Status must be 'success' or 'failed'",
-                "result": None
-            }
-        
         try:
-            result_message = f"Execution terminated with status: {status}"
-            if message:
-                result_message += f" - {message}"
+            result_message = f"Plan presented to user for approval:\n\n{plan}"
             
             return {
                 "error": None,
                 "result": result_message,
-                "status": status,
-                "message": message,
-                "terminated": True
+                "plan": plan,
+                "exited_plan_mode": True
             }
             
         except Exception as e:
             return {
-                "error": f"Error executing exit: {str(e)}",
+                "error": f"Error executing exit plan mode: {str(e)}",
                 "result": None
             }

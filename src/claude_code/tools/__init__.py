@@ -15,6 +15,10 @@ from .web_fetch_tool import WebFetchTool
 from .todo_write_tool import TodoWriteTool
 from .web_search_tool import WebSearchTool
 from .exit_tool import ExitTool
+from .multi_edit_tool import MultiEditTool
+from .notebook_edit_tool import NotebookEditTool
+from .bash_output_tool import BashOutputTool
+from .kill_bash_tool import KillBashTool
 
 __all__ = [
     'BaseTool',
@@ -29,5 +33,9 @@ __all__ = [
     'WebFetchTool',
     'TodoWriteTool',
     'WebSearchTool',
-    'ExitTool'
+    'ExitTool',
+    'MultiEditTool',
+    'NotebookEditTool',
+    'BashOutputTool',
+    'KillBashTool'
 ]

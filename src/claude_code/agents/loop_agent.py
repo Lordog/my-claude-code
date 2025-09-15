@@ -108,6 +108,7 @@ class LoopAgent(BaseAgent):
                 
                 # Check if Exit tool was called
                 if self._check_for_exit(tool_actions):
+                    self.logger.info(f"Exit tool called at iteration {iteration}")
                     return self._handle_kimi_exit(response, tool_actions)
                 
                 # Execute tool actions if any
